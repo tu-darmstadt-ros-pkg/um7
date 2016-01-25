@@ -46,10 +46,17 @@
 #include "um7/Reset.h"
 #include <string>
 
+#include <tf/transform_datatypes.h>
+
 float covar[9];     // orientation covariance values
 double linear_acceleration_cov; // Linear acceleration covariance
 double angular_velocity_cov; // Angular velocity covariance
 const char VERSION[10] = "0.0.2";   // um7_driver version
+
+double mount_roll;
+double mount_pitch;
+double mount_yaw;
+boost::shared_ptr<tf::Transform> mount_transform;
 
 // Don't try to be too clever. Arrival of this message triggers
 // us to publish everything we have.
@@ -217,12 +224,6 @@ void publishMsgs(um7::Registers& r, ros::NodeHandle* n, const std_msgs::Header& 
     sensor_msgs::Imu imu_msg;
     imu_msg.header = header;
 
-    // IMU outputs [w,x,y,z], convert to [x,y,z,w] & transform to ROS axes
-    imu_msg.orientation.x =  r.quat.get_scaled(1);
-    imu_msg.orientation.y = -r.quat.get_scaled(2);
-    imu_msg.orientation.z = -r.quat.get_scaled(3);
-    imu_msg.orientation.w = r.quat.get_scaled(0);
-
     // Covariance of attitude.  set to constant default or parameter values
     imu_msg.orientation_covariance[0] = covar[0];
     imu_msg.orientation_covariance[1] = covar[1];
@@ -234,23 +235,51 @@ void publishMsgs(um7::Registers& r, ros::NodeHandle* n, const std_msgs::Header& 
     imu_msg.orientation_covariance[7] = covar[7];
     imu_msg.orientation_covariance[8] = covar[8];
 
+    imu_msg.angular_velocity_covariance[0] = angular_velocity_cov;
+    imu_msg.angular_velocity_covariance[4] = angular_velocity_cov;
+    imu_msg.angular_velocity_covariance[8] = angular_velocity_cov;
+
+    imu_msg.linear_acceleration_covariance[0] = linear_acceleration_cov;
+    imu_msg.linear_acceleration_covariance[4] = linear_acceleration_cov;
+    imu_msg.linear_acceleration_covariance[8] = linear_acceleration_cov;
+
+    // IMU outputs [w,x,y,z], convert to [x,y,z,w] & transform to ROS axes
+    imu_msg.orientation.x =  r.quat.get_scaled(1);
+    imu_msg.orientation.y = -r.quat.get_scaled(2);
+    imu_msg.orientation.z = -r.quat.get_scaled(3);
+    imu_msg.orientation.w = r.quat.get_scaled(0);
+
     // Angular velocity.  transform to ROS axes
     imu_msg.angular_velocity.x =  r.gyro.get_scaled(0);
     imu_msg.angular_velocity.y = -r.gyro.get_scaled(1);
     imu_msg.angular_velocity.z = -r.gyro.get_scaled(2);
-
-    imu_msg.angular_velocity_covariance[0] = angular_velocity_cov;
-    imu_msg.angular_velocity_covariance[4] = angular_velocity_cov;
-    imu_msg.angular_velocity_covariance[8] = angular_velocity_cov;
 
     // Linear accel.  transform to ROS axes
     imu_msg.linear_acceleration.x =  r.accel.get_scaled(0);
     imu_msg.linear_acceleration.y = -r.accel.get_scaled(1);
     imu_msg.linear_acceleration.z = -r.accel.get_scaled(2);
 
-    imu_msg.linear_acceleration_covariance[0] = linear_acceleration_cov;
-    imu_msg.linear_acceleration_covariance[4] = linear_acceleration_cov;
-    imu_msg.linear_acceleration_covariance[8] = linear_acceleration_cov;
+    // If mount transform is non-zero, transform data
+    if (mount_transform.get()){
+        tf::Quaternion orientation;
+        tf::Vector3 angular_velocity, linear_acceleration;
+
+        // convert to tf data types
+        tf::quaternionMsgToTF(imu_msg.orientation, orientation);
+        tf::vector3MsgToTF(imu_msg.angular_velocity, angular_velocity);
+        tf::vector3MsgToTF(imu_msg.linear_acceleration, linear_acceleration);
+
+        // transform data
+        orientation = *mount_transform * orientation;
+        angular_velocity = *mount_transform * angular_velocity;
+        linear_acceleration = *mount_transform * linear_acceleration;
+
+        // prepare message to send and convert from tf to geometry_msgs
+        tf::quaternionTFToMsg(orientation, imu_msg.orientation);
+        tf::vector3TFToMsg(angular_velocity, imu_msg.angular_velocity);
+        tf::vector3TFToMsg(linear_acceleration, imu_msg.linear_acceleration);
+    }
+
 
     imu_pub.publish(imu_msg);
   }
@@ -329,6 +358,21 @@ int main(int argc, char **argv)
     if (p) covar[iter] = atof(p);                // covar[] is global var
     else  covar[iter] = 0.0;
     p = strtok_r(NULL, " ", &ptr1);              // point to next value (nil if none)
+  }
+
+  ros::param::param<double>("~mount_roll", mount_roll, 0.0);
+  ros::param::param<double>("~mount_pitch", mount_pitch, 0.0);
+  ros::param::param<double>("~mount_yaw", mount_yaw, 0.0);
+
+  if (mount_roll != 0.0 || mount_pitch != 0.0 || mount_yaw != 0.0){
+    mount_transform.reset(new tf::Transform());
+
+    tf::Matrix3x3 rot_matrix;
+    rot_matrix.setRPY(mount_roll, mount_pitch, mount_yaw);
+
+    tf::Quaternion rot_quat;
+    rot_matrix.getRotation(rot_quat);
+    ROS_INFO("[imu_transformer] Using IMU transform: roll: %f pitch: %f yaw: %f", mount_roll, mount_pitch, mount_yaw);
   }
 
   double linear_acceleration_stdev, angular_velocity_stdev;
