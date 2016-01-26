@@ -392,8 +392,8 @@ int main(int argc, char **argv)
     mount_transform.reset(new tf::Transform());
     mount_transform->setIdentity();
 
-    tf::Matrix3x3 rot_matrix;
-    rot_matrix.setRPY(mount_roll, mount_pitch, mount_yaw);
+    tf::Matrix3x3 rot_matrix(0, 1, 0, 0, 0, 1, 1, 0, 0);
+    //rot_matrix = rot_matrix.transpose();
 
     tf::Quaternion rot_quat;
     rot_matrix.getRotation(rot_quat);
