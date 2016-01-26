@@ -390,12 +390,15 @@ int main(int argc, char **argv)
 
   if (mount_roll != 0.0 || mount_pitch != 0.0 || mount_yaw != 0.0){
     mount_transform.reset(new tf::Transform());
+    mount_transform->setIdentity();
 
     tf::Matrix3x3 rot_matrix;
     rot_matrix.setRPY(mount_roll, mount_pitch, mount_yaw);
 
     tf::Quaternion rot_quat;
     rot_matrix.getRotation(rot_quat);
+    
+    mount_transform->setRotation(rot_quat);
     ROS_INFO("[imu_transformer] Using IMU transform: roll: %f pitch: %f yaw: %f", mount_roll, mount_pitch, mount_yaw);
   }
 
