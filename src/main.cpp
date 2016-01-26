@@ -36,6 +36,7 @@
  */
 
 #include "geometry_msgs/Vector3Stamped.h"
+#include <geometry_msgs/PoseStamped.h>
 #include "ros/ros.h"
 #include "sensor_msgs/Imu.h"
 #include "serial/serial.h"            // must install serial library from apt-get
@@ -219,6 +220,10 @@ void publishMsgs(um7::Registers& r, ros::NodeHandle* n, const std_msgs::Header& 
   static ros::Publisher rpy_pub = n->advertise<geometry_msgs::Vector3Stamped>("imu/rpy", 1, false);
   static ros::Publisher temp_pub = n->advertise<std_msgs::Float32>("imu/temperature", 1, false);
 
+  static ros::Publisher pose_raw_pub = n->advertise<geometry_msgs::PoseStamped>("~pose_raw", 1, false);
+  static ros::Publisher pose_mount_pub = n->advertise<geometry_msgs::PoseStamped>("~pose_mount", 1, false);
+
+
   if (imu_pub.getNumSubscribers() > 0)
   {
     sensor_msgs::Imu imu_msg;
@@ -259,6 +264,16 @@ void publishMsgs(um7::Registers& r, ros::NodeHandle* n, const std_msgs::Header& 
     imu_msg.linear_acceleration.y = -r.accel.get_scaled(1);
     imu_msg.linear_acceleration.z = -r.accel.get_scaled(2);
 
+    if (pose_raw_pub.getNumSubscribers() > 0){
+      geometry_msgs::PoseStamped pose;
+
+      pose.header = imu_msg.header;
+      pose.header.frame_id = "world";
+      pose.pose.orientation = imu_msg.orientation;
+
+      pose_raw_pub.publish(pose);
+    }
+
     // If mount transform is non-zero, transform data
     if (mount_transform.get()){
         tf::Quaternion orientation;
@@ -280,6 +295,15 @@ void publishMsgs(um7::Registers& r, ros::NodeHandle* n, const std_msgs::Header& 
         tf::vector3TFToMsg(linear_acceleration, imu_msg.linear_acceleration);
     }
 
+    if (pose_mount_pub.getNumSubscribers() > 0){
+      geometry_msgs::PoseStamped pose;
+
+      pose.header = imu_msg.header;
+      pose.header.frame_id = "world";
+      pose.pose.orientation = imu_msg.orientation;
+
+      pose_mount_pub.publish(pose);
+    }
 
     imu_pub.publish(imu_msg);
   }
