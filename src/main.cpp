@@ -220,8 +220,8 @@ void publishMsgs(um7::Registers& r, ros::NodeHandle* n, const std_msgs::Header& 
   static ros::Publisher rpy_pub = n->advertise<geometry_msgs::Vector3Stamped>("imu/rpy", 1, false);
   static ros::Publisher temp_pub = n->advertise<std_msgs::Float32>("imu/temperature", 1, false);
 
-  static ros::Publisher pose_raw_pub = n->advertise<geometry_msgs::PoseStamped>("~pose_raw", 1, false);
-  static ros::Publisher pose_mount_pub = n->advertise<geometry_msgs::PoseStamped>("~pose_mount", 1, false);
+  static ros::Publisher pose_raw_pub = n->advertise<geometry_msgs::PoseStamped>("imu_um7_pose_raw", 1, false);
+  static ros::Publisher pose_mount_pub = n->advertise<geometry_msgs::PoseStamped>("imu_um7_pose_mount", 1, false);
 
 
   if (imu_pub.getNumSubscribers() > 0)
