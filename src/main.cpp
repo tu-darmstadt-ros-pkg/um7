@@ -249,19 +249,19 @@ void publishMsgs(um7::Registers& r, ros::NodeHandle* n, const std_msgs::Header& 
     imu_msg.linear_acceleration_covariance[8] = linear_acceleration_cov;
 
     // IMU outputs [w,x,y,z], convert to [x,y,z,w] & transform to ROS axes
-    imu_msg.orientation.x =  r.quat.get_scaled(1);
-    imu_msg.orientation.y = -r.quat.get_scaled(2);
+    imu_msg.orientation.x =  r.quat.get_scaled(2);
+    imu_msg.orientation.y =  r.quat.get_scaled(1);
     imu_msg.orientation.z = -r.quat.get_scaled(3);
-    imu_msg.orientation.w = r.quat.get_scaled(0);
+    imu_msg.orientation.w =  r.quat.get_scaled(0);
 
     // Angular velocity.  transform to ROS axes
-    imu_msg.angular_velocity.x =  r.gyro.get_scaled(0);
-    imu_msg.angular_velocity.y = -r.gyro.get_scaled(1);
+    imu_msg.angular_velocity.x =  r.gyro.get_scaled(1);
+    imu_msg.angular_velocity.y =  r.gyro.get_scaled(0);
     imu_msg.angular_velocity.z = -r.gyro.get_scaled(2);
 
     // Linear accel.  transform to ROS axes
-    imu_msg.linear_acceleration.x =  r.accel.get_scaled(0);
-    imu_msg.linear_acceleration.y = -r.accel.get_scaled(1);
+    imu_msg.linear_acceleration.x =  r.accel.get_scaled(1);
+    imu_msg.linear_acceleration.y =  r.accel.get_scaled(0);
     imu_msg.linear_acceleration.z = -r.accel.get_scaled(2);
 
     if (pose_raw_pub.getNumSubscribers() > 0){
