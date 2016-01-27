@@ -54,11 +54,6 @@ double linear_acceleration_cov; // Linear acceleration covariance
 double angular_velocity_cov; // Angular velocity covariance
 const char VERSION[10] = "0.0.2";   // um7_driver version
 
-double mount_roll;
-double mount_pitch;
-double mount_yaw;
-boost::shared_ptr<tf::Transform> mount_transform;
-
 // Don't try to be too clever. Arrival of this message triggers
 // us to publish everything we have.
 const uint8_t TRIGGER_PACKET = DREG_EULER_PHI_THETA;
@@ -221,8 +216,6 @@ void publishMsgs(um7::Registers& r, ros::NodeHandle* n, const std_msgs::Header& 
   static ros::Publisher temp_pub = n->advertise<std_msgs::Float32>("imu/temperature", 1, false);
 
   static ros::Publisher pose_raw_pub = n->advertise<geometry_msgs::PoseStamped>("imu_um7_pose_raw", 1, false);
-  static ros::Publisher pose_mount_pub = n->advertise<geometry_msgs::PoseStamped>("imu_um7_pose_mount", 1, false);
-
 
   if (imu_pub.getNumSubscribers() > 0)
   {
@@ -249,19 +242,19 @@ void publishMsgs(um7::Registers& r, ros::NodeHandle* n, const std_msgs::Header& 
     imu_msg.linear_acceleration_covariance[8] = linear_acceleration_cov;
 
     // IMU outputs [w,x,y,z], convert to [x,y,z,w] & transform to ROS axes
-    imu_msg.orientation.x =  r.quat.get_scaled(2);
-    imu_msg.orientation.y =  r.quat.get_scaled(1);
+    imu_msg.orientation.x =  r.quat.get_scaled(1);
+    imu_msg.orientation.y = -r.quat.get_scaled(2);
     imu_msg.orientation.z = -r.quat.get_scaled(3);
-    imu_msg.orientation.w =  r.quat.get_scaled(0);
+    imu_msg.orientation.w = r.quat.get_scaled(0);
 
     // Angular velocity.  transform to ROS axes
-    imu_msg.angular_velocity.x =  r.gyro.get_scaled(1);
-    imu_msg.angular_velocity.y =  r.gyro.get_scaled(0);
+    imu_msg.angular_velocity.x =  r.gyro.get_scaled(0);
+    imu_msg.angular_velocity.y = -r.gyro.get_scaled(1);
     imu_msg.angular_velocity.z = -r.gyro.get_scaled(2);
 
     // Linear accel.  transform to ROS axes
-    imu_msg.linear_acceleration.x =  r.accel.get_scaled(1);
-    imu_msg.linear_acceleration.y =  r.accel.get_scaled(0);
+    imu_msg.linear_acceleration.x =  r.accel.get_scaled(0);
+    imu_msg.linear_acceleration.y = -r.accel.get_scaled(1);
     imu_msg.linear_acceleration.z = -r.accel.get_scaled(2);
 
     if (pose_raw_pub.getNumSubscribers() > 0){
@@ -272,37 +265,6 @@ void publishMsgs(um7::Registers& r, ros::NodeHandle* n, const std_msgs::Header& 
       pose.pose.orientation = imu_msg.orientation;
 
       pose_raw_pub.publish(pose);
-    }
-
-    // If mount transform is non-zero, transform data
-    if (mount_transform.get()){
-        tf::Quaternion orientation;
-        tf::Vector3 angular_velocity, linear_acceleration;
-
-        // convert to tf data types
-        tf::quaternionMsgToTF(imu_msg.orientation, orientation);
-        tf::vector3MsgToTF(imu_msg.angular_velocity, angular_velocity);
-        tf::vector3MsgToTF(imu_msg.linear_acceleration, linear_acceleration);
-
-        // transform data
-        orientation = *mount_transform * orientation;
-        angular_velocity = *mount_transform * angular_velocity;
-        linear_acceleration = *mount_transform * linear_acceleration;
-
-        // prepare message to send and convert from tf to geometry_msgs
-        tf::quaternionTFToMsg(orientation, imu_msg.orientation);
-        tf::vector3TFToMsg(angular_velocity, imu_msg.angular_velocity);
-        tf::vector3TFToMsg(linear_acceleration, imu_msg.linear_acceleration);
-    }
-
-    if (pose_mount_pub.getNumSubscribers() > 0){
-      geometry_msgs::PoseStamped pose;
-
-      pose.header = imu_msg.header;
-      pose.header.frame_id = "world";
-      pose.pose.orientation = imu_msg.orientation;
-
-      pose_mount_pub.publish(pose);
     }
 
     imu_pub.publish(imu_msg);
@@ -382,24 +344,6 @@ int main(int argc, char **argv)
     if (p) covar[iter] = atof(p);                // covar[] is global var
     else  covar[iter] = 0.0;
     p = strtok_r(NULL, " ", &ptr1);              // point to next value (nil if none)
-  }
-
-  ros::param::param<double>("~mount_roll", mount_roll, 0.0);
-  ros::param::param<double>("~mount_pitch", mount_pitch, 0.0);
-  ros::param::param<double>("~mount_yaw", mount_yaw, 0.0);
-
-  if (mount_roll != 0.0 || mount_pitch != 0.0 || mount_yaw != 0.0){
-    mount_transform.reset(new tf::Transform());
-    mount_transform->setIdentity();
-
-    tf::Matrix3x3 rot_matrix(0, 1, 0, 0, 0, 1, 1, 0, 0);
-    //rot_matrix = rot_matrix.transpose();
-
-    tf::Quaternion rot_quat;
-    rot_matrix.getRotation(rot_quat);
-    
-    mount_transform->setRotation(rot_quat);
-    ROS_INFO("[imu_transformer] Using IMU transform: roll: %f pitch: %f yaw: %f", mount_roll, mount_pitch, mount_yaw);
   }
 
   double linear_acceleration_stdev, angular_velocity_stdev;
