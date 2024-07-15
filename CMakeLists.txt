@@ -49,19 +49,18 @@ file(GLOB LINT_SRCS
   include/um6/registers.h
   include/um6/comms.h)
 roslint_cpp(${LINT_SRCS})
-roslint_add_test()
 
 #############
 ## Testing ##
 #############
-
-catkin_add_gtest(${PROJECT_NAME}_test_registers test/test_registers.cpp src/registers.cpp)
-catkin_add_gtest(${PROJECT_NAME}_test_comms test/test_comms.cpp src/comms.cpp src/registers.cpp)
-if(TARGET ${PROJECT_NAME}_test_comms)
-  target_link_libraries(${PROJECT_NAME}_test_comms util ${catkin_LIBRARIES})
+if(CATKIN_ENABLE_TESTING)
+  roslint_add_test()
+  catkin_add_gtest(${PROJECT_NAME}_test_registers test/test_registers.cpp src/registers.cpp)
+  catkin_add_gtest(${PROJECT_NAME}_test_comms test/test_comms.cpp src/comms.cpp src/registers.cpp)
+  if(TARGET ${PROJECT_NAME}_test_comms)
+    target_link_libraries(${PROJECT_NAME}_test_comms util ${catkin_LIBRARIES})
+  endif()
+  if(TARGET ${PROJECT_NAME}_test_registers)
+    target_link_libraries(${PROJECT_NAME}_test_registers util ${catkin_LIBRARIES})
+  endif()
 endif()
-if(TARGET ${PROJECT_NAME}_test_registers)
-  target_link_libraries(${PROJECT_NAME}_test_registers util ${catkin_LIBRARIES})
-endif()
-
-
